@@ -1,0 +1,11 @@
+site_name: Cookiekaker
+site_description: A project template and directory structure for certain Python data science projects.
+site_favicon: favicon.ico
+repo_url: https://github.com/metya/Cookiekaker
+edit_uri: edit/master/docs/docs
+copyright: Project maintained by the friendly folks.
+theme: cinder
+extra_css:
+  - css/extra.css
+pages:
+  - Home: index.md

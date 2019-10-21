@@ -1,0 +1,17 @@
+repos:
+-   repo: git://github.com/pre-commit/pre-commit-hooks
+    rev: v1.4.0
+    hooks:
+    -   id: flake8
+        exclude: (^tests/.*\.py$|docs/conf.py|setup.py)
+        args:
+        - --ignore=W503
+    -   id: check-added-large-files
+-   repo: git://github.com/pre-commit/mirrors-pylint
+    rev: v2.3.0
+    hooks:
+    -   id: pylint
+        exclude: (^tests/.*\.py$|docs/conf.py|setup.py)
+        args:
+        - --errors-only
+        - --disable=import-error
