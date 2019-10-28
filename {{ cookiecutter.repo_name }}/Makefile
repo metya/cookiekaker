@@ -12,6 +12,12 @@ PYTHON_INTERPRETER = {{ cookiecutter.python_interpreter }}
 # GIT = {{ cookiecutter.git_remote_repo }}
 USERNAME = {{ cookiecutter.author_name }}
 
+ifeq (,$(shell which conda))
+HAS_CONDA=False
+else
+HAS_CONDA=True
+endif
+
 #################################################################################
 # COMMANDS                                                                      #
 #################################################################################
@@ -33,49 +39,83 @@ lint:
 
 ## Make Dataset
 data: requirements
-	$(PYTHON_INTERPRETER) src/data/make_dataset.py data/raw data/processed
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/utils/make_dataset.py
 
 ## Upload Data to S3
 sync_data_to_s3:
 ifeq (default,$(S3PROFILE))
-	aws s3 sync data/ s3://$(S3BUCKET)/data/
+	aws s3 sync data/ s3://$(S3BUCKET)/data/ 
+	aws s3 sync models/ s3://$(S3BUCKET)/models/
 else
 	aws s3 sync data/ s3://$(S3BUCKET)/data/ --profile $(S3PROFILE)
+	aws s3 sync models/ s3://$(S3BUCKET)/models/ --profile $(S3PROFILE)
+
 endif
 
 ## Download Data from S3
 sync_data_from_s3:
 ifeq (default,$(S3PROFILE))
 	aws s3 sync s3://$(S3BUCKET)/data/ data/
+	aws s3 sync s3://$(S3BUCKET)/models/ models/
 else
 	aws s3 sync s3://$(S3BUCKET)/data/ data/ --profile $(S3PROFILE)
+	aws s3 sync s3://$(S3BUCKET)/models/ models/ --profile $(S3PROFILE)
 endif
 
 ## Upload to minio
 sync_data_to_minio:
 ifeq (default,$(MINIOPROFILE))
-	rclone --size-only sync data/ $(MINIO)/data/ --stats-one-line -P --stats 2s
+	rclone sync data/ $(MINIO)/$(PROJECT_NAME)/data/ --stats-one-line -P --stats 2s
+	rclone sync models/ $(MINIO)/$(PROJECT_NAME)/models/ --stats-one-line -P --stats 2s
 
 ## Download from minio
-sync_data_to_minio:
+sync_data_from_minio:
 ifeq (default,$(MINIOPROFILE))
-	rclone --size-only sync $(MINIO)/data/ data/ --stats-one-line -P --stats 2s
+	rclone sync $(MINIO)/$(PROJECT_NAME)/data/ data/ --stats-one-line -P --stats 2s
+	rclone sync $(MINIO)/$(PROJECT_NAME)/models/ models/ --stats-one-line -P --stats 2s
 
 
 ## Initial set up of python interpreter environment, version control and pre-commit hooks
 initial_setup:
-	@bash -c "virtualenv -p $(PYTHON_INTERPRETER) $(HOME)/envs/$(PROJECT_NAME)"
+ifeq (True,$(HAS_CONDA))
+		@echo ">>> Detected conda, creating conda environment."
+ifeq (3,$(findstring 3,$(PYTHON_INTERPRETER)))
+	conda create --name $(PROJECT_NAME) python=3
+endif
 	@bash -c "git init"
-	@bash -c "source $(HOME)/envs/$(PROJECT_NAME)/bin/activate; pip install dvc[all]; dvc init"
+	@bash -c "source activate $(PROJECT_NAME); pip install dvc[all]; dvc init"
 	@bash -c "echo '[core]' >> $(PROJECT_DIR)/.dvc/config"
 	@bash -c "echo 'analytics = false' >> $(PROJECT_DIR)/.dvc/config"
-	@bash -c "source $(HOME)/envs/$(PROJECT_NAME)/bin/activate; pip install pre-commit; pre-commit install; pre-commit autoupdate"
-	@bash -c "source $(HOME)/envs/$(PROJECT_NAME)/bin/activate; pip install -r $(PROJECT_DIR)/requirements.txt"
+	@bash -c "source activate $(PROJECT_NAME); pip install pre-commit; pre-commit install; pre-commit autoupdate"
+	@bash -c "source activate $(PROJECT_NAME);; pip install -r $(PROJECT_DIR)/requirements.txt"
 	@bash -c "echo 'CWD=$(PROJECT_DIR)' >> $(PROJECT_DIR)/.env"
+	@bash -c "echo '.env' >> $(PROJECT_DIR)/.gitignore"
 	@bash -c "git add . ; git commit -am 'INITIAL COMMIT'"
 	@bash -c "git remote add origin https://github.com/$(USERNAME)/$(PROJECT_NAME).git"
-# 	@bash -c "git remote add origin $(GIT)"	
-	@echo ">>> New virtualenv created. Activate with:\nsource $(HOME)/envs/$(PROJECT_NAME)/bin/activate"
+	# @bash -c "git remote add origin $(GIT)"
+	@bash -c "git push -u origin" && echo "upload repo to the remote" || echo "repository $(PROJECT_NAME) doesn't exist yet, please create it."
+	@echo ">>> New virtualenv created. Activate with:\nsource activate $(PROJECT_NAME)"
+	@echo ">>> git and dvc are ready to go"
+
+else
+	$(PYTHON_INTERPRETER) -m pip install -q virtualenv virtualenvwrapper
+	@echo ">>> Installing virtualenvwrapper if not already installed.\nMake sure the following lines are in shell startup file\n\
+				export WORKON_HOME=$$HOME/.virtualenvs\nexport PROJECT_HOME=$$HOME/Devel\nsource /usr/local/bin/virtualenvwrapper.sh\n"
+	@bash -c "source `which virtualenvwrapper.sh`; mkvirtualenv $(PROJECT_NAME) --python=$(PYTHON_INTERPRETER)"
+	@echo ">>> Initializing git repo"
+	@bash -c "git init"
+	@bash -c "workon $(PROJECT_NAME); pip install dvc[all]; dvc init"
+	@bash -c "echo '[core]' >> $(PROJECT_DIR)/.dvc/config"
+	@bash -c "echo 'analytics = false' >> $(PROJECT_DIR)/.dvc/config"
+	@bash -c "workon $(PROJECT_NAME); pip install pre-commit; pre-commit install; pre-commit autoupdate"
+	@bash -c "workon $(PROJECT_NAME);; pip install -r $(PROJECT_DIR)/requirements.txt"
+	@bash -c "echo 'CWD=$(PROJECT_DIR)' >> $(PROJECT_DIR)/.env"
+	@bash -c "echo '.env' >> $(PROJECT_DIR)/.gitignore"
+	@bash -c "git add . ; git commit -am 'INITIAL COMMIT'"
+	@bash -c "git remote add origin https://github.com/$(USERNAME)/$(PROJECT_NAME).git"
+	# 	@bash -c "git remote add origin $(GIT)"	
+	@bash -c "git push -u origin" && echo "upload repo to the remote" || echo "repository $(PROJECT_NAME) doesn't exist yet, please create it."
+	@echo ">>> New virtualenv created. Activate with:\nworkon $(PROJECT_NAME)"
 	@echo ">>> git and dvc are ready to go"
 
 ## Following set up of python interpreter environment, version control and pre-commit hooks
@@ -88,10 +128,16 @@ following_setup:
 	@echo ">>> git and dvc are ready to go"
 
 requirements:
-	@bash -c "source $(HOME)/envs/$(PROJECT_NAME)/bin/activate; pip install -r $(PROJECT_DIR)/requirements.txt"
+ifeq (True,$(HAS_CONDA))
+	@bash -c "workon $(PROJECT_NAME)/bin/activate; pip install -r $(PROJECT_DIR)/requirements.txt"
+else
+	@bash -c "source activate $(PROJECT_NAME)/bin/activate; pip install -r $(PROJECT_DIR)/requirements.txt"
 
 environment:
-	@echo ">>> Activate with:\nsource $(HOME)/envs/$(PROJECT_NAME)/bin/activate"
+ifeq (True,$(HAS_CONDA))
+	@echo ">>> Activate with:\nsource activate $(PROJECT_NAME)
+else 
+	@echo ">>> Activate with:\nworkon $(PROJECT_NAME)
 
 commit:
 	$(eval EXP_FILE := "$(PROJECT_DIR)/$(PROJECT_NAME)/study_name.txt")
@@ -100,7 +146,10 @@ commit:
 
 push:
 	@bash -c "git push origin --follow-tags"
-	@bash -c "source $(HOME)/envs/$(PROJECT_NAME)/bin/activate; dvc push"
+ifeq (True,$(HAS_CONDA))
+	@bash -c "source activate $(PROJECT_NAME); dvc push"
+else
+	@bash -c "workon $(PROJECT_NAME); dvc push"
 
 #################################################################################
 # PROJECT RULES                                                                 #

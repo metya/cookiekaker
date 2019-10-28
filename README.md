@@ -1,4 +1,4 @@
-# Cookiekaker Cookiecutter Data Science Template inspired by @vasinkd and @drivendata
+# Cookiekaker Deep Learning Template inspired by @vasinkd and @drivendata
 
 _A not quite logical, nad unreasonably standardized, but flexible project structure for doing and sharing data science work at certain motivation and place._
 

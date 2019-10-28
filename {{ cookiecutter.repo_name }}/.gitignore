@@ -57,7 +57,7 @@ docs/_build/
 target/
 
 # DotEnv configuration
-.env
+# .env
 
 # Database
 *.db
@@ -84,3 +84,16 @@ target/
 
 # Mypy cache
 .mypy_cache/
+
+# Data folders
+/data/*
+!/data/raw/
+!/data/README.md
+models/*
+logs/*
+
+
+
+
+
+
