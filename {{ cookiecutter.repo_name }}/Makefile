@@ -9,7 +9,7 @@ MINIO = {{ cookiecutter.minio }}
 MINIOPROFILE = {{ cookiecutter.minio_profile }}
 PROJECT_NAME = {{ cookiecutter.repo_name }}
 PYTHON_INTERPRETER = {{ cookiecutter.python_interpreter }}
-# GIT = {{ cookiecutter.git_remote_repo }}
+GIT = {{ cookiecutter.git_remote_repo }}
 USERNAME = {{ cookiecutter.author_name }}
 
 ifeq (,$(shell which conda))
@@ -65,14 +65,14 @@ endif
 ## Upload to minio
 sync_data_to_minio:
 ifeq (default,$(MINIOPROFILE))
-	rclone sync data/ $(MINIO):$(PROJECT_NAME)/data/ --stats-one-line -P --stats 2s
-	rclone sync models/ $(MINIO):$(PROJECT_NAME)/models/ --stats-one-line -P --stats 2s
+	rclone sync data/ $(MINIO)/$(PROJECT_NAME)/data/ --stats-one-line -P --stats 2s
+	rclone sync models/ $(MINIO)/$(PROJECT_NAME)/models/ --stats-one-line -P --stats 2s
 
 ## Download from minio
 sync_data_from_minio:
 ifeq (default,$(MINIOPROFILE))
-	rclone sync $(MINIO):$(PROJECT_NAME)/data/ data/ --stats-one-line -P --stats 2s
-	rclone sync $(MINIO):$(PROJECT_NAME)/models/ models/ --stats-one-line -P --stats 2s
+	rclone sync $(MINIO)/$(PROJECT_NAME)/data/ data/ --stats-one-line -P --stats 2s
+	rclone sync $(MINIO)/$(PROJECT_NAME)/models/ models/ --stats-one-line -P --stats 2s
 
 
 ## Initial set up of python interpreter environment, version control and pre-commit hooks
